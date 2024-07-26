@@ -116,13 +116,80 @@ class Gitpulse {
                 console.log(cli_color_1.default.green("Added all the files to staging area"));
             }
             else {
-                const filePath = path_1.default.join(process.cwd(), file);
-                if (!fs_1.default.existsSync(filePath)) {
-                    return console.log(cli_color_1.default.magenta(`${file} does not exist in ${filePath}`));
+                var filePath = path_1.default.join(process.cwd(), file);
+                const stats = fs_1.default.existsSync(filePath) ? fs_1.default.statSync(file) : null;
+                if (!stats) {
+                    return console.log(cli_color_1.default.magentaBright(`${file} does not exist in ${filePath}`));
                 }
-                else {
+                if (stats.isFile()) {
+                    console.log("File");
+                    const lindex = file.lastIndexOf("/");
+                    var firstPart = file.slice(0, lindex);
+                    firstPart = path_1.default.join(this.stagingPath, firstPart);
+                    const fileName = file.slice(lindex);
+                    console.log(lindex, firstPart, fileName);
+                    const filecontent = fs_1.default.readFileSync(filePath, "utf-8");
+                    // console.log(filePath);
+                    fs_1.default.mkdirSync(firstPart, { recursive: true });
+                    fs_1.default.writeFileSync(path_1.default.join(firstPart, fileName), filecontent);
                 }
-                console.log(cli_color_1.default.green(`Added ${file} to staging area`));
+                else if (stats.isDirectory()) {
+                    console.log("D");
+                    const items = fs_1.default.readdirSync(filePath, { withFileTypes: true });
+                    // filePath = filePath.replace(/\\/g, '/')
+                    //  fs.mkdir(path.join(this.stagingPath,file),{recursive:true},(err)=>{
+                    //   console.log(err)
+                    //  });
+                    this.readDirectory(filePath, file);
+                    // console.log(filePath,"test/z",filePath.includes(file));
+                }
+                // console.log(clc.green(`Added ${file} to staging area`));
+            }
+        });
+    }
+    readDirectory(directoryPath, file) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const items = yield fs_1.default.readdirSync(directoryPath, { withFileTypes: true });
+                for (const item of items) {
+                    var fullPath = path_1.default.join(directoryPath, item.name);
+                    fullPath = fullPath.replace(/\\/g, '/');
+                    const index = fullPath.indexOf(file);
+                    if (item.isDirectory()) {
+                        yield this.readDirectory(fullPath, file);
+                    }
+                    else if (item.isFile()) {
+                        const content = fs_1.default.readFileSync(fullPath, "utf-8");
+                        const pathindex = fullPath.slice(index);
+                        // console.log(`Path:${fullPath.slice(index)}`);
+                        // console.log(`File: ${fullPath}`);
+                        // console.log(`Content: ${content}`);
+                        if (!fs_1.default.existsSync(path_1.default.join(this.stagingPath, pathindex))) {
+                            const lindex = pathindex.lastIndexOf("/");
+                            const firstPart = pathindex.slice(0, lindex);
+                            const filename = pathindex.slice(lindex);
+                            const firstPath = path_1.default.join(this.stagingPath, firstPart);
+                            // console.log("Does not exts in OBJ",firstPart,lindex,filename);
+                            try {
+                                console.log("A");
+                                fs_1.default.mkdirSync(firstPath, { recursive: true });
+                            }
+                            catch (error) {
+                                console.log("ERROR ####", error);
+                            }
+                            try {
+                                console.log("B");
+                                fs_1.default.writeFileSync(path_1.default.join(firstPath, filename), content);
+                            }
+                            catch (error) {
+                                console.log("Already added to stage area");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (error) {
+                console.error(`Error reading directory: ${error}`);
             }
         });
     }

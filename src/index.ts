@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import fs from "fs";
+import fs, { cpSync } from "fs";
 import crypto from "crypto"
 import  dirCompare from "dir-compare"
 import clc from "cli-color"
@@ -104,13 +104,76 @@ class Gitpulse{
       if(file === "."){
         console.log(clc.green("Added all the files to staging area"));
       }else{
-        const filePath = path.join(process.cwd(),file);
-        if(!fs.existsSync(filePath)){
-          return console.log(clc.magenta(`${file} does not exist in ${filePath}`));
-        }else{
-
+        var filePath = path.join(process.cwd(),file);
+        const stats = fs.existsSync(filePath)? fs.statSync(file):null;
+        if(!stats){
+          return console.log(clc.magentaBright(`${file} does not exist in ${filePath}`));
         }
-        console.log(clc.green(`Added ${file} to staging area`));
+        if(stats.isFile()){
+          console.log("File");
+          const lindex = file.lastIndexOf("/");
+          var firstPart = file.slice(0, lindex);
+          firstPart = path.join(this.stagingPath,firstPart);
+          const fileName = file.slice(lindex);
+          console.log(lindex,firstPart,fileName);
+          const filecontent = fs.readFileSync(filePath,"utf-8")
+          // console.log(filePath);
+          fs.mkdirSync(firstPart, { recursive: true });
+          fs.writeFileSync(path.join(firstPart,fileName),filecontent);
+
+        }else if (stats.isDirectory()){
+          console.log("D");
+          const items =  fs.readdirSync(filePath, { withFileTypes: true });
+          // filePath = filePath.replace(/\\/g, '/')
+          //  fs.mkdir(path.join(this.stagingPath,file),{recursive:true},(err)=>{
+          //   console.log(err)
+          //  });
+          this.readDirectory(filePath,file);
+          // console.log(filePath,"test/z",filePath.includes(file));
+        }
+        // console.log(clc.green(`Added ${file} to staging area`));
+      }
+    }
+    async readDirectory(directoryPath:string,file:string) {
+      try {
+        const items = await fs.readdirSync(directoryPath, { withFileTypes: true });
+    
+        for (const item of items) {
+          var fullPath = path.join(directoryPath, item.name);
+          fullPath = fullPath.replace(/\\/g, '/');
+          const index = fullPath.indexOf(file);
+         
+          if (item.isDirectory()) {
+            await this.readDirectory(fullPath,file);
+          } else if (item.isFile()) {
+            const content =  fs.readFileSync(fullPath,"utf-8");
+            const pathindex  = fullPath.slice(index);
+            // console.log(`Path:${fullPath.slice(index)}`);
+            // console.log(`File: ${fullPath}`);
+            // console.log(`Content: ${content}`);
+            if(!fs.existsSync(path.join(this.stagingPath,pathindex))){
+                const lindex = pathindex.lastIndexOf("/");
+                const firstPart = pathindex.slice(0, lindex);
+                const filename = pathindex.slice(lindex);
+                const firstPath = path.join(this.stagingPath,firstPart);
+                // console.log("Does not exts in OBJ",firstPart,lindex,filename);
+                try {
+                  console.log("A");
+                  fs.mkdirSync(firstPath, { recursive: true });
+                } catch (error) {
+                  console.log("ERROR ####",error)
+                }
+                try {
+                  console.log("B");
+                  fs.writeFileSync(path.join(firstPath,filename),content);
+                } catch (error) {
+                  console.log("Already added to stage area");
+                }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error reading directory: ${error}`);
       }
     }
 
