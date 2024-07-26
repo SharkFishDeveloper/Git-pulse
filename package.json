@@ -1,0 +1,20 @@
+{
+  "name": "gitpulse",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "git": "tsc -b && node ./dist/index"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.14.12"
+  },
+  "dependencies": {
+    "@types/commander": "^2.12.2",
+    "commander": "^12.1.0",
+    "dir-compare": "^5.0.0"
+  }
+}
