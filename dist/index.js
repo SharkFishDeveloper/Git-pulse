@@ -16,9 +16,9 @@ const commander_1 = require("commander");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const crypto_1 = __importDefault(require("crypto"));
-var configPath = path_1.default.resolve(__dirname, 'gitpulse-config.json');
+var configPath = path_1.default.join(process.cwd(), "/.gitpulse/config.json");
 class Gitpulse {
-    constructor(fileName) {
+    constructor() {
         this.rootpath = '';
         this.gitpath = '';
         this.fileName = "";
@@ -26,28 +26,20 @@ class Gitpulse {
         this.stagingPath = "";
         this.commitsPath = "";
         this.configPath = "";
-        if (fileName === "") {
-            console.log("Return");
-            return;
-        }
-        this.fileName = fileName;
-        if (fileName !== "status" && !fs_1.default.existsSync(path_1.default.join(this.rootpath, path_1.default.join(`${this.fileName}`)))) {
-            console.log("No such directory with this name", fileName);
-            return;
-        }
         this.rootpath = process.cwd();
-        this.gitpath = path_1.default.join(this.rootpath, path_1.default.join(`${this.fileName}`, "/.gitpulse"));
-        this.objPath = path_1.default.join(this.gitpath + path_1.default.join("/obj"));
-        this.stagingPath = path_1.default.join(this.gitpath + path_1.default.join("/staging"));
-        this.commitsPath = path_1.default.join(this.gitpath + path_1.default.join("/commits.txt"));
-        // configPath=path.resolve(this.gitpath,'gitpulse-config.json');
-        if (fileName !== "status") {
-            this.init();
+        this.gitpath = path_1.default.join(this.rootpath, ".gitpulse");
+        this.objPath = path_1.default.join(this.gitpath, "obj");
+        this.stagingPath = path_1.default.join(this.gitpath, "staging");
+        this.commitsPath = path_1.default.join(this.gitpath, "commits.txt");
+        console.log("START");
+        if (!fs_1.default.existsSync(path_1.default.join(this.gitpath))) {
+            console.log("No git directory exists");
         }
+        console.log("CONFIG", configPath);
+        this.init();
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            const pathFile = path_1.default.join(process.cwd(), `/${this.fileName}`);
             const gitExists = fs_1.default.existsSync(this.gitpath);
             console.log(this.gitpath);
             if (!gitExists) {
@@ -80,13 +72,13 @@ class Gitpulse {
         if (fs_1.default.existsSync(configPath)) {
             const config = JSON.parse(fs_1.default.readFileSync(configPath, 'utf-8'));
             console.log("true");
-            return new Gitpulse(config.fileName);
+            return new Gitpulse();
         }
         return null;
     }
     saveToConfig() {
         const config = {
-            fileName: this.fileName,
+            fileName: process.cwd(),
         };
         fs_1.default.writeFileSync(configPath, JSON.stringify(config), 'utf-8');
     }
@@ -99,13 +91,7 @@ function createHash({ data = "" }) {
 }
 const program = new commander_1.Command();
 let gitpulse;
-// program
-//   .command('init <name>')
-//   .action((name: string) => {
-//     gitpulse = new Gitpulse(name);
-//     gitpulse.saveToConfig();
-//     // console.log("HERE",configPath);
-//   });
+const args = process.argv.slice(2);
 program
     .command('status')
     .description('Check the status of the project')
@@ -118,26 +104,17 @@ program
         console.error('Gitpulse not initialized. Please run "init" with the name of the project first.');
     }
 });
-// program.parse(process.argv);
-const args = process.argv.slice(2);
-if (args[0] === "init") {
-    if (!args[1]) {
-        console.log("No project name found , Please run npm run dev init --name <name>");
-    }
-    else {
-        gitpulse = new Gitpulse(args[1]);
-        gitpulse.saveToConfig();
-    }
-}
-else {
-    try {
-        program.parse(args);
-        console.log("Over here");
-    }
-    catch (error) {
-        console.log(error);
-    }
-}
+program
+    .command('init')
+    .description('Initialize Gitpulse in project')
+    .action((options, command) => {
+    console.log("INIT COMMAND");
+    gitpulse = new Gitpulse();
+    gitpulse.saveToConfig();
+    console.log("Git found");
+});
+program.parse(process.argv);
+// console.log("Commands parsed:", process.argv);
 // const data = fs.readdir(pathFile,{recursive:true},(err,files)=>{
 //       if (err) {
 //         console.error('Error reading directory:', err);

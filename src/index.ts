@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto"
 
-var configPath = path.resolve(__dirname, 'gitpulse-config.json');
+var configPath = path.join(process.cwd(),"/.gitpulse/config.json");
 
 class Gitpulse{
     rootpath = '';
@@ -13,29 +13,21 @@ class Gitpulse{
     stagingPath="";
     commitsPath="";
     configPath="";
-    constructor(fileName:string){
-        if(fileName===""){
-             console.log("Return");
-             return;
-        }
-        this.fileName = fileName;
-        if(fileName!=="status" &&  !fs.existsSync(path.join(this.rootpath,path.join(`${this.fileName}`)))){
-            console.log("No such directory with this name",fileName);
-            return;
-        }
-        this.rootpath = process.cwd();
-        this.gitpath = path.join(this.rootpath,path.join(`${this.fileName}`,"/.gitpulse"));
-        this.objPath = path.join(this.gitpath+path.join("/obj"));
-        this.stagingPath = path.join(this.gitpath+path.join("/staging"));
-        this.commitsPath = path.join(this.gitpath+path.join("/commits.txt"));
-        // configPath=path.resolve(this.gitpath,'gitpulse-config.json');
-        if(fileName!=="status"){
 
-          this.init();
+    constructor(){
+        this.rootpath = process.cwd();
+        this.gitpath = path.join(this.rootpath, ".gitpulse");
+        this.objPath = path.join(this.gitpath, "obj");
+        this.stagingPath = path.join(this.gitpath, "staging");
+        this.commitsPath = path.join(this.gitpath, "commits.txt");
+        console.log("START");
+        if(!fs.existsSync(path.join(this.gitpath))){
+          console.log("No git directory exists");
         }
+        console.log("CONFIG",configPath);
+        this.init();
     }
     async init(){
-        const pathFile = path.join(process.cwd(),`/${this.fileName}`);
         const gitExists = fs.existsSync(this.gitpath);
         console.log(this.gitpath);
         if(!gitExists){
@@ -64,17 +56,17 @@ class Gitpulse{
         console.log(data);
     }
     static loadFromConfig(): Gitpulse | null {
-        if (fs.existsSync(configPath)) {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-          console.log("true");
-          return new Gitpulse(config.fileName);
-        }
-        return null;
-      }
+    if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        console.log("true");
+        return new Gitpulse();
+    }
+    return null;
+}
     
       saveToConfig() {
         const config = {
-          fileName: this.fileName,
+          fileName: process.cwd(),
         };
         fs.writeFileSync(configPath, JSON.stringify(config), 'utf-8');
       }
@@ -91,16 +83,8 @@ function createHash({data=""}:{data:string}) {
 
 const program = new Command();
 
-let gitpulse: Gitpulse | null;
-
-
-// program
-//   .command('init <name>')
-//   .action((name: string) => {
-//     gitpulse = new Gitpulse(name);
-//     gitpulse.saveToConfig();
-//     // console.log("HERE",configPath);
-//   });
+let gitpulse: Gitpulse | null ;
+const args = process.argv.slice(2);
 
 
 program
@@ -115,33 +99,19 @@ program
     }
   });
 
-// program.parse(process.argv);
-
-
-
-
-  const args = process.argv.slice(2);
-if(args[0]==="init"){
-  if(!args[1]){
-    console.log("No project name found , Please run npm run dev init --name <name>");
-  }
-  else{
-    gitpulse= new Gitpulse(args[1]);
-    gitpulse.saveToConfig();
-  }
-}else{
-   try {
-    program.parse(args);
-    console.log("Over here");
-   } catch (error) {
-    console.log(error);
-   }
-}
-
-
-
-
-
+  
+  program
+  .command('init')
+  .description('Initialize Gitpulse in project')
+  .action((options, command) => {
+      console.log("INIT COMMAND");
+      gitpulse = new Gitpulse();
+      gitpulse.saveToConfig();
+      console.log("Git found");
+  });
+  program.parse(process.argv);
+  
+  // console.log("Commands parsed:", process.argv);
         // const data = fs.readdir(pathFile,{recursive:true},(err,files)=>{
         //       if (err) {
         //         console.error('Error reading directory:', err);
