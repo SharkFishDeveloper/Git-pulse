@@ -20,11 +20,9 @@ class Gitpulse{
         this.objPath = path.join(this.gitpath, "obj");
         this.stagingPath = path.join(this.gitpath, "staging");
         this.commitsPath = path.join(this.gitpath, "commits.txt");
-        console.log("START");
         if(!fs.existsSync(path.join(this.gitpath))){
           console.log("No git directory exists");
         }
-        console.log("CONFIG",configPath);
         this.init();
     }
     async init(){
@@ -47,29 +45,57 @@ class Gitpulse{
                 console.log(error);
             }
         }else{
-            console.log("Git exists");
+            // console.log(".gitpulse aleady exists");
         }
     }
-    
-    status(){
-        const data = fs.readFileSync(`${this.commitsPath}`,"utf-8");
-        console.log(data);
-    }
+
     static loadFromConfig(): Gitpulse | null {
-    if (fs.existsSync(configPath)) {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        console.log("true");
-        return new Gitpulse();
-    }
-    return null;
-}
-    
-      saveToConfig() {
-        const config = {
-          fileName: process.cwd(),
-        };
-        fs.writeFileSync(configPath, JSON.stringify(config), 'utf-8');
+      if (fs.existsSync(configPath)) {
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          return new Gitpulse();
       }
+      return null;
+    }
+      
+    saveToConfig() {
+      const config = {
+        fileName: process.cwd(),
+      };
+      fs.writeFileSync(configPath, JSON.stringify(config), 'utf-8');
+    }
+    
+      filesDirectory(){
+        return new Promise((resolve, reject) => {
+            const commit = fs.readFileSync(`${this.commitsPath}`,"utf-8");
+            console.log(commit);
+            const files = fs.readdir(process.cwd(),{recursive:true},(err,files)=>{
+              if (err) {
+                console.error('Error reading directory:', err);
+                reject(err);
+              }
+              const regex = /\.[a-zA-Z0-9]+$/;
+              const filteredFiles = files.filter(file=>{
+                const fileName = file as string;
+                return !fileName.startsWith('.git') &&
+                !fileName.startsWith('.gitpulse') &&
+                !fileName.startsWith('node_modules') &&
+                !fileName.startsWith('package') &&
+                !fileName.startsWith('tsconfig') &&
+                !fileName.startsWith('src') &&
+                !fileName.startsWith('dist');
+              })
+              const correctedFiles = filteredFiles.filter(file => regex.test(file as string));
+              resolve(correctedFiles);
+        });
+      });
+    }
+
+   async status(){
+      const files = await this.filesDirectory();
+      console.log("files",files);
+    }
+
+
 
 }
 
@@ -104,10 +130,8 @@ program
   .command('init')
   .description('Initialize Gitpulse in project')
   .action((options, command) => {
-      console.log("INIT COMMAND");
       gitpulse = new Gitpulse();
       gitpulse.saveToConfig();
-      console.log("Git found");
   });
   program.parse(process.argv);
   
