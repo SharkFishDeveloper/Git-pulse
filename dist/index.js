@@ -16,12 +16,12 @@ const commander_1 = require("commander");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const crypto_1 = __importDefault(require("crypto"));
+const cli_color_1 = __importDefault(require("cli-color"));
 var configPath = path_1.default.join(process.cwd(), "/.gitpulse/config.json");
 class Gitpulse {
     constructor() {
         this.rootpath = '';
         this.gitpath = '';
-        this.fileName = "";
         this.objPath = "";
         this.stagingPath = "";
         this.commitsPath = "";
@@ -39,7 +39,6 @@ class Gitpulse {
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             const gitExists = fs_1.default.existsSync(this.gitpath);
-            console.log(this.gitpath);
             if (!gitExists) {
                 try {
                     fs_1.default.mkdir(this.gitpath, { recursive: true }, (err) => {
@@ -64,7 +63,6 @@ class Gitpulse {
     }
     static loadFromConfig() {
         if (fs_1.default.existsSync(configPath)) {
-            const config = JSON.parse(fs_1.default.readFileSync(configPath, 'utf-8'));
             return new Gitpulse();
         }
         return null;
@@ -102,8 +100,30 @@ class Gitpulse {
     }
     status() {
         return __awaiter(this, void 0, void 0, function* () {
+            const commitId = fs_1.default.readFileSync(this.commitsPath, "utf-8");
             const files = yield this.filesDirectory();
-            console.log("files", files);
+            const normalizedFiles = files.map(file => path_1.default.join(process.cwd(), file));
+            files.forEach((file) => {
+                if (!fs_1.default.existsSync(path_1.default.join(this.objPath, file))) {
+                    console.log(cli_color_1.default.red("New -> ", `${file}`));
+                }
+            });
+        });
+    }
+    add(file) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (file === ".") {
+                console.log(cli_color_1.default.green("Added all the files to staging area"));
+            }
+            else {
+                const filePath = path_1.default.join(process.cwd(), file);
+                if (!fs_1.default.existsSync(filePath)) {
+                    return console.log(cli_color_1.default.magenta(`${file} does not exist in ${filePath}`));
+                }
+                else {
+                }
+                console.log(cli_color_1.default.green(`Added ${file} to staging area`));
+            }
         });
     }
 }
@@ -135,20 +155,10 @@ program
     gitpulse = new Gitpulse();
     gitpulse.saveToConfig();
 });
+program.command('add <action>')
+    .description("Add files to stage area")
+    .action((action) => {
+    gitpulse = Gitpulse.loadFromConfig();
+    gitpulse === null || gitpulse === void 0 ? void 0 : gitpulse.add(action);
+});
 program.parse(process.argv);
-// console.log("Commands parsed:", process.argv);
-// const data = fs.readdir(pathFile,{recursive:true},(err,files)=>{
-//       if (err) {
-//         console.error('Error reading directory:', err);
-//         return;
-//       }
-//       const regex = /\.[a-zA-Z0-9]+$/;
-//       const filteredFiles = files.filter(file => regex.test(file as string));
-//       console.log('Files in directory:', filteredFiles); 
-// });
-// fs.mkdir(this.gitpath+path.join("/obj"),{recursive:true},(err)=>{
-//     const initialHash = createHash({data:""});
-//     fs.mkdir(this.gitpath+path.join(`/obj/${initialHash}`),{recursive:true},(err)=>{
-//         console.log(err);
-//     });
-// });
