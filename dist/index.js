@@ -17,6 +17,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const crypto_1 = __importDefault(require("crypto"));
 const cli_color_1 = __importDefault(require("cli-color"));
+const fs_extra_1 = __importDefault(require("fs-extra"));
 var configPath = path_1.default.join(process.cwd(), "/.gitpulse/config.json");
 class Gitpulse {
     constructor() {
@@ -243,32 +244,36 @@ class Gitpulse {
             try {
                 const items = fs_1.default.readdirSync(directoryPath, { withFileTypes: true });
                 for (const item of items) {
-                    console.log("-->", directoryPath, file, item.name, pathData);
+                    // console.log("-->",directoryPath,file,item.name,pathData);
                     var fullPath = path_1.default.join(directoryPath, item.name);
                     fullPath = fullPath.replace(/\\/g, '/');
                     const index = fullPath.indexOf(file);
                     if (item.isDirectory()) {
+                        console.log("D");
                         yield this.readDirectory(fullPath, file, pathData);
-                        console.log("Path data", pathData);
                     }
                     else if (item.isFile()) {
+                        console.log("F");
                         const content = fs_1.default.readFileSync(fullPath, "utf-8");
                         const pathindex = fullPath.slice(index);
                         // console.log(`Path:${fullPath.slice(index)}`);
                         // console.log(`File: ${fullPath}`);
                         // console.log(`Content: ${content}`);
+                        var firstPath = "";
                         if (!fs_1.default.existsSync(path_1.default.join(this.stagingPath, pathindex))) {
+                            console.log("Does not Ex");
                             const lindex = pathindex.lastIndexOf("/");
                             const firstPart = pathindex.slice(0, lindex);
                             const filename = pathindex.slice(lindex);
-                            const firstPath = pathData === "staging" ? path_1.default.join(this.stagingPath, firstPart) : path_1.default.join(pathData, firstPart);
+                            console.log("First part", firstPart);
+                            firstPath = pathData === "staging" ? path_1.default.join(this.stagingPath, firstPart) : pathData;
+                            console.log("FIRST PATH", firstPath);
                             // console.log("Does not exts in OBJ",firstPart,lindex,filename);
-                            try {
-                                fs_1.default.mkdirSync(firstPath, { recursive: true });
-                            }
-                            catch (error) {
-                                console.log("ERROR ####", error);
-                            }
+                            // try {
+                            //   fs.mkdirSync(firstPath, { recursive: true });
+                            // } catch (error) {
+                            //   console.log("ERROR ####",error)
+                            // }
                             // console.log("Content",content);
                             try {
                                 fs_1.default.writeFileSync(path_1.default.join(firstPath, filename), content);
@@ -278,11 +283,19 @@ class Gitpulse {
                             }
                         }
                         else {
+                            console.log("Exists");
+                            console.log("FIRST PATH", firstPath);
                             const lindex = pathindex.lastIndexOf("/");
                             const firstPart = pathindex.slice(0, lindex);
                             const filename = pathindex.slice(lindex);
-                            const firstPath = path_1.default.join(this.stagingPath, firstPart);
-                            fs_1.default.writeFileSync(path_1.default.join(firstPath, filename), content);
+                            const firstPathQ = pathData === "staging" ? path_1.default.join(this.stagingPath, firstPart) : pathData;
+                            console.log("staging data", firstPathQ);
+                            try {
+                                fs_1.default.writeFileSync(path_1.default.join(firstPathQ, filename), content);
+                            }
+                            catch (error) {
+                                console.log("->>>>>>", error);
+                            }
                         }
                     }
                 }
@@ -296,15 +309,48 @@ class Gitpulse {
         return __awaiter(this, void 0, void 0, function* () {
             console.log("Commit Message : ", message);
             const commitDataPath = fs_1.default.readFileSync(this.commitsPath, "utf-8");
+            const pathStage = [];
+            const stagedFiles = [];
+            const regex = /\.[a-zA-Z0-9]+$/;
             if (commitDataPath === "init") {
-                console.log("AAA");
-                const filesDir = yield this.filesDirectoryToStageEverything();
-                // console.log(this.objPath,commitDataPath,filesDir);
-                const pathnew = path_1.default.join(this.objPath, commitDataPath);
-                filesDir.forEach((files) => {
-                    console.log("?????????", path_1.default.join(process.cwd(), files));
-                    this.readDirectory(path_1.default.join(process.cwd(), files), files, pathnew);
+                try {
+                    const files = yield new Promise((resolve, reject) => {
+                        fs_1.default.readdir(this.stagingPath, (err, files) => {
+                            if (err) {
+                                reject(err);
+                            }
+                            else {
+                                resolve(files);
+                            }
+                        });
+                    });
+                    stagedFiles.push(...files);
+                }
+                catch (err) {
+                    console.error("Error reading staging directory:", err);
+                }
+            }
+            stagedFiles.forEach((file) => __awaiter(this, void 0, void 0, function* () {
+                pathStage.push(path_1.default.join(this.stagingPath, file));
+                const path1 = (path_1.default.join(this.stagingPath, file));
+                yield this.copyDirectory(path1, path_1.default.join(this.objPath, "init"))
+                    .then(() => console.log('Copy operation completed successfully'))
+                    .catch(err => console.error('Error during copy operation:', err));
+            }));
+            console.log(pathStage);
+        });
+    }
+    copyDirectory(sourceDir, destDir) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                yield fs_extra_1.default.copy(sourceDir, destDir, {
+                    overwrite: true, // Overwrites the content if it already exists
+                    errorOnExist: false // Don't throw an error if the destination exists
                 });
+                console.log(`Copied from ${sourceDir} to ${destDir}`);
+            }
+            catch (error) {
+                console.error(`Error copying directory: ${error}`);
             }
         });
     }

@@ -4,6 +4,7 @@ import fs from "fs";
 import crypto from "crypto"
 import  dirCompare from "dir-compare"
 import clc from "cli-color"
+import fsExtra from 'fs-extra';
 
 var configPath = path.join(process.cwd(),"/.gitpulse/config.json");
 
@@ -231,31 +232,37 @@ class Gitpulse{
         const items =  fs.readdirSync(directoryPath, { withFileTypes: true });
     
         for (const item of items) {
-          console.log("-->",directoryPath,file,item.name,pathData);
+          // console.log("-->",directoryPath,file,item.name,pathData);
           var fullPath = path.join(directoryPath, item.name);
           fullPath = fullPath.replace(/\\/g, '/');
           const index = fullPath.indexOf(file);
          
           if (item.isDirectory()) {
+            console.log("D")
             await this.readDirectory(fullPath,file,pathData);
-            console.log("Path data",pathData)
+            
           } else if (item.isFile()) {
+            console.log("F")
             const content =  fs.readFileSync(fullPath,"utf-8");
             const pathindex  = fullPath.slice(index);
             // console.log(`Path:${fullPath.slice(index)}`);
             // console.log(`File: ${fullPath}`);
             // console.log(`Content: ${content}`);
+            var firstPath="";
             if(!fs.existsSync(path.join(this.stagingPath,pathindex))){
+              console.log("Does not Ex")
                 const lindex = pathindex.lastIndexOf("/");
                 const firstPart = pathindex.slice(0, lindex);
                 const filename = pathindex.slice(lindex);
-                const firstPath = pathData==="staging"?path.join(this.stagingPath,firstPart):path.join(pathData,firstPart);
+                console.log("First part",firstPart)
+                 firstPath = pathData==="staging"?path.join(this.stagingPath,firstPart):pathData
+                 console.log("FIRST PATH",firstPath);
                 // console.log("Does not exts in OBJ",firstPart,lindex,filename);
-                try {
-                  fs.mkdirSync(firstPath, { recursive: true });
-                } catch (error) {
-                  console.log("ERROR ####",error)
-                }
+                // try {
+                //   fs.mkdirSync(firstPath, { recursive: true });
+                // } catch (error) {
+                //   console.log("ERROR ####",error)
+                // }
                 // console.log("Content",content);
                 try {
                   fs.writeFileSync(path.join(firstPath,filename),content);
@@ -263,11 +270,18 @@ class Gitpulse{
                   console.log("Already added to stage area");
                 }
             }else{
+              console.log("Exists")
+              console.log("FIRST PATH",firstPath);
               const lindex = pathindex.lastIndexOf("/");
               const firstPart = pathindex.slice(0, lindex);
               const filename = pathindex.slice(lindex);
-              const firstPath = path.join(this.stagingPath,firstPart);
-              fs.writeFileSync(path.join(firstPath,filename),content);
+              const firstPathQ =pathData==="staging"? path.join(this.stagingPath,firstPart):pathData
+              console.log("staging data",firstPathQ);
+              try {
+                fs.writeFileSync(path.join(firstPathQ,filename),content);
+              } catch (error) {
+                console.log("->>>>>>",error)
+              }
             }
           }
         }
@@ -278,19 +292,51 @@ class Gitpulse{
 
 
     async commit(message:string){
-      console.log("Commit Message : ",message);
-      const commitDataPath:string  = fs.readFileSync(this.commitsPath,"utf-8") ;
-      if(commitDataPath==="init"){
-        console.log("AAA");
-        const filesDir =await this.filesDirectoryToStageEverything();
-        // console.log(this.objPath,commitDataPath,filesDir);
-        const pathnew = path.join(this.objPath,commitDataPath);
-        filesDir.forEach((files)=>{
-          console.log("?????????",path.join(process.cwd(),files));
-          this.readDirectory(path.join(process.cwd(),files),files,pathnew);
-        })
+      console.log("Commit Message : ", message);
+      const commitDataPath: string = fs.readFileSync(this.commitsPath, "utf-8");
+      const pathStage:string[]|null = []; 
+      const stagedFiles: string[] | null = [];
+      const regex = /\.[a-zA-Z0-9]+$/;
+    
+      if (commitDataPath === "init") {
+        try {
+          const files:string[] = await new Promise((resolve, reject) => {
+            fs.readdir(this.stagingPath, (err, files) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(files);
+              }
+            });
+          });
+          stagedFiles.push(...files); 
+        } catch (err) {
+          console.error("Error reading staging directory:", err);
+        }
       }
+      stagedFiles.forEach(async(file)=>{
+        pathStage.push(path.join(this.stagingPath,file));
+        const path1  = (path.join(this.stagingPath,file));
+        await this.copyDirectory(path1, path.join(this.objPath,"init"))
+        .then(() => console.log('Copy operation completed successfully'))
+        .catch(err => console.error('Error during copy operation:', err));
+      })
+      console.log(pathStage);
     }
+
+
+
+    async  copyDirectory(sourceDir: string, destDir: string): Promise<void> {
+      try {
+          await fsExtra.copy(sourceDir, destDir, {
+              overwrite: true, // Overwrites the content if it already exists
+              errorOnExist: false // Don't throw an error if the destination exists
+          });
+          console.log(`Copied from ${sourceDir} to ${destDir}`);
+      } catch (error) {
+          console.error(`Error copying directory: ${error}`);
+      }
+  }
 
 
 }
