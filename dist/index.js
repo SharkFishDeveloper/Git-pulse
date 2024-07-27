@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -16,6 +39,7 @@ const commander_1 = require("commander");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const crypto_1 = __importDefault(require("crypto"));
+const dirCompare = __importStar(require("dir-compare"));
 const cli_color_1 = __importDefault(require("cli-color"));
 const fs_extra_1 = __importDefault(require("fs-extra"));
 var configPath = path_1.default.join(process.cwd(), "/.gitpulse/config.json");
@@ -301,7 +325,7 @@ class Gitpulse {
                 }
             }
             catch (error) {
-                console.error(`Error reading directory: ${error}`);
+                // console.error(`Error reading directory: ${error}`);
             }
         });
     }
@@ -332,12 +356,11 @@ class Gitpulse {
             }
             stagedFiles.forEach((file) => __awaiter(this, void 0, void 0, function* () {
                 pathStage.push(path_1.default.join(this.stagingPath, file));
-                const path1 = (path_1.default.join(this.stagingPath, file));
+                const path1 = this.stagingPath;
                 yield this.copyDirectory(path1, path_1.default.join(this.objPath, "init"))
-                    .then(() => console.log('Copy operation completed successfully'))
-                    .catch(err => console.error('Error during copy operation:', err));
+                    .then(() => console.log(''))
+                    .catch(err => console.error(''));
             }));
-            console.log(pathStage);
         });
     }
     copyDirectory(sourceDir, destDir) {
@@ -347,10 +370,35 @@ class Gitpulse {
                     overwrite: true, // Overwrites the content if it already exists
                     errorOnExist: false // Don't throw an error if the destination exists
                 });
-                console.log(`Copied from ${sourceDir} to ${destDir}`);
+                //!
+                // console.log(`Copied from ${sourceDir} to ${destDir}`);
             }
             catch (error) {
-                console.error(`Error copying directory: ${error}`);
+                //!
+                // console.error(`Error copying directory: ${error}`);
+            }
+        });
+    }
+    compareDir() {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            const options = {
+                compareContent: true, // Compare file contents
+                compareFileSync: true, // Compare files synchronously
+            };
+            const commitFileData = fs_1.default.readFileSync(this.commitsPath, "utf-8");
+            const stagingDir = this.stagingPath;
+            const objDirWithId = path_1.default.join(this.objPath, commitFileData);
+            const res = dirCompare.compareSync(stagingDir, objDirWithId, { compareContent: true });
+            if (!res.same) {
+                (_a = res.diffSet) === null || _a === void 0 ? void 0 : _a.forEach(diff => {
+                    if (diff.state === "distinct") {
+                        console.log(diff);
+                    }
+                    else if (diff.state === "left") {
+                        console.log(diff);
+                    }
+                });
             }
         });
     }
@@ -389,6 +437,13 @@ program
     .action((message) => {
     gitpulse = Gitpulse.loadFromConfig();
     gitpulse === null || gitpulse === void 0 ? void 0 : gitpulse.commit(message);
+});
+program
+    .command('compare')
+    .description('Commits the project')
+    .action((message) => {
+    gitpulse = Gitpulse.loadFromConfig();
+    gitpulse === null || gitpulse === void 0 ? void 0 : gitpulse.compareDir();
 });
 program.command('add <action>')
     .description("Add files to stage area")

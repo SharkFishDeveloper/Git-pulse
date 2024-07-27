@@ -2,7 +2,7 @@ import { Command } from "commander";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto"
-import  dirCompare from "dir-compare"
+import * as dirCompare from 'dir-compare';
 import clc from "cli-color"
 import fsExtra from 'fs-extra';
 
@@ -286,7 +286,7 @@ class Gitpulse{
           }
         }
       } catch (error) {
-        console.error(`Error reading directory: ${error}`);
+        // console.error(`Error reading directory: ${error}`);
       }
     }
 
@@ -316,12 +316,11 @@ class Gitpulse{
       }
       stagedFiles.forEach(async(file)=>{
         pathStage.push(path.join(this.stagingPath,file));
-        const path1  = (path.join(this.stagingPath,file));
+        const path1  = this.stagingPath;
         await this.copyDirectory(path1, path.join(this.objPath,"init"))
-        .then(() => console.log('Copy operation completed successfully'))
-        .catch(err => console.error('Error during copy operation:', err));
+        .then(() => console.log(''))
+        .catch(err => console.error(''));
       })
-      console.log(pathStage);
     }
 
 
@@ -332,11 +331,34 @@ class Gitpulse{
               overwrite: true, // Overwrites the content if it already exists
               errorOnExist: false // Don't throw an error if the destination exists
           });
-          console.log(`Copied from ${sourceDir} to ${destDir}`);
+          //!
+          // console.log(`Copied from ${sourceDir} to ${destDir}`);
       } catch (error) {
-          console.error(`Error copying directory: ${error}`);
+        //!
+          // console.error(`Error copying directory: ${error}`);
       }
-  }
+    }
+
+    async compareDir(){
+      const options = {
+        compareContent: true, // Compare file contents
+        compareFileSync: true, // Compare files synchronously
+      };
+      const commitFileData = fs.readFileSync(this.commitsPath,"utf-8"); 
+      const stagingDir = this.stagingPath;
+      const objDirWithId = path.join(this.objPath,commitFileData);
+      const res = dirCompare.compareSync(stagingDir, objDirWithId,{ compareContent: true});
+
+      if (!res.same) {
+          res.diffSet?.forEach(diff => {
+              if(diff.state==="distinct"){
+                console.log(diff);
+              }else if(diff.state==="left"){
+                console.log(diff);
+              }
+          });
+}
+    }
 
 
 }
@@ -381,6 +403,14 @@ program
   .action((message:string) => {
       gitpulse = Gitpulse.loadFromConfig();
       gitpulse?.commit(message);
+  });
+
+  program
+  .command('compare')
+  .description('Commits the project')
+  .action((message:string) => {
+      gitpulse = Gitpulse.loadFromConfig();
+      gitpulse?.compareDir();
   });
   
   program.command('add <action>')
