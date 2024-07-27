@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import fs, { cpSync } from "fs";
+import fs from "fs";
 import crypto from "crypto"
 import  dirCompare from "dir-compare"
 import clc from "cli-color"
@@ -89,20 +89,112 @@ class Gitpulse{
       });
     }
 
-   async status(){
-      const commitId = fs.readFileSync(this.commitsPath,"utf-8");
-      const files = await this.filesDirectory();
-      const normalizedFiles = files.map(file => path.join(process.cwd(),file));
-      files.forEach((file)=>{
-        if(!fs.existsSync(path.join(this.objPath,file))){
-          console.log(clc.red("New -> ",`${file}`));
+     async filesDirectoryToStageEverything(): Promise<string[]> {
+      return new Promise((resolve, reject) => {
+        const files = fs.readdir(process.cwd(),(err,files)=>{
+          if (err) {
+            console.error('Error reading directory:', err);
+            reject(err);
+          }
+          const filteredFiles = files.filter(file=>{
+            const fileName = file as string;
+            return !fileName.startsWith('.git') &&
+            !fileName.startsWith('.gitpulse') &&
+            !fileName.startsWith('node_modules') &&
+            !fileName.startsWith('package') &&
+            !fileName.startsWith('tsconfig') &&
+            !fileName.startsWith('src') &&
+            !fileName.startsWith('dist');
+          })
+          resolve(filteredFiles);
+    });
+    });
+    }
+
+    async checkUpdates(){
+      const filesDirectory = await this.filesDirectory();
+      const normalizedFiles = filesDirectory.map(file => path.join(process.cwd(),file));
+      const regex = /\.[a-zA-Z0-9]+$/;
+      let correctedFilesStaging:string[]|null=[];
+      const stagingFiles = fs.readdir(this.stagingPath,{recursive:true},(err,files)=>{
+        const correctedFiles = files.filter(file => regex.test(file as string));
+        correctedFilesStaging?.push(...correctedFiles.map(file => file.toString().replace(/\\/g, '\\')));
+      });
+      // console.log("stagingFiles",correctedFilesStaging);
+      
+      correctedFilesStaging.forEach((fileS)=>{
+        if(!filesDirectory.includes(fileS)){
+          var hasExtension:boolean|string = fileS.includes('.') && !fileS.endsWith('.');
+            if (hasExtension) {
+              hasExtension = 'file'
+            } else {
+               hasExtension = 'directory'
+            }
+            const fileinDirectorypath = path.join(this.stagingPath,fileS);
+            const filePath = path.join(this.stagingPath,fileS);
+            const lindex = fileinDirectorypath.lastIndexOf("\\");
+            const filePathCheck = fileinDirectorypath.slice(0,lindex)
+            // console.log("FIle path",filePathCheck);
+          try {
+            fs.unlinkSync(filePath);
+            if(!fs.existsSync(filePathCheck)){
+              console.log("File does not exist",filePathCheck)
+              fs.rmdirSync(filePathCheck);
+            }
+          } catch (error) {
+            
+          }
+          console.log(`${fileS } does not exist in working directory`);
         }
       })
+      const untrackedFiles:string[]|null = [];
+      const modifiedFiles:string[]|null = [];
+      const stagingFilesMatching:string[]|null = [];
+      filesDirectory?.map((file=>{
+        const filePath = path.join(this.stagingPath,file);
+        if(fs.existsSync(filePath)){
+          const stagingFilePath = path.join(process.cwd(),file);
+          const contentFileDir = fs.readFileSync(filePath,"utf-8");
+          const contentFileStaging = fs.readFileSync(stagingFilePath,"utf-8");
+          if(contentFileDir!==contentFileStaging){
+            modifiedFiles.push(file);
+          }
+          // console.log("File path exists",file,contentFileDir,contentFileStaging)
+        }
+        else{
+          untrackedFiles.push(file);
+        //  console.log(clc.red(`Untracked file -> ${file}`));
+        }
+      }))
+      if(untrackedFiles.length>0){
+        console.log(clc.whiteBright("Use git add . or git add <file> to add to staging area"));
+      }
+      untrackedFiles.forEach((file) => {
+        console.log(clc.red(`Untracked file -> ${file}`));
+      });
+      modifiedFiles.forEach((file) => {
+        console.log(clc.yellow(`Modified file -> ${file}`));
+      });
+      if(untrackedFiles.length === 0 && modifiedFiles.length===0){
+        console.log(clc.greenBright("Everything is up to date"));
+      }
+      // setInterval(() => this.checkUpdates(), 5000);
+    }
+
+
+    async status(){
+     await this.checkUpdates();
     }
 
     async add(file:string) {
       if(file === "."){
         console.log(clc.green("Added all the files to staging area"));
+        const filesDir =await this.filesDirectoryToStageEverything();
+        const pathnew = process.cwd();
+        filesDir.forEach((files)=>{
+          this.readDirectory(path.join(pathnew,files),files);
+        })
+        console.log(clc.greenBright("Everything is staged"))
       }else{
         var filePath = path.join(process.cwd(),file);
         const stats = fs.existsSync(filePath)? fs.statSync(file):null;
@@ -110,30 +202,28 @@ class Gitpulse{
           return console.log(clc.magentaBright(`${file} does not exist in ${filePath}`));
         }
         if(stats.isFile()){
-          console.log("File");
           const lindex = file.lastIndexOf("/");
           var firstPart = file.slice(0, lindex);
           firstPart = path.join(this.stagingPath,firstPart);
           const fileName = file.slice(lindex);
-          console.log(lindex,firstPart,fileName);
+          // console.log(firstPart)
+          // console.log(lindex)
+          // console.log(fileName)
+          // console.log(lindex,firstPart,file,"####");
           const filecontent = fs.readFileSync(filePath,"utf-8")
-          // console.log(filePath);
+          // console.log(firstPart,filePath)
           fs.mkdirSync(firstPart, { recursive: true });
           fs.writeFileSync(path.join(firstPart,fileName),filecontent);
 
         }else if (stats.isDirectory()){
-          console.log("D");
           const items =  fs.readdirSync(filePath, { withFileTypes: true });
-          // filePath = filePath.replace(/\\/g, '/')
-          //  fs.mkdir(path.join(this.stagingPath,file),{recursive:true},(err)=>{
-          //   console.log(err)
-          //  });
+          console.log(filePath,file)
           this.readDirectory(filePath,file);
-          // console.log(filePath,"test/z",filePath.includes(file));
         }
-        // console.log(clc.green(`Added ${file} to staging area`));
+        console.log(clc.green(`Added ${file} to staging area`));
       }
     }
+
     async readDirectory(directoryPath:string,file:string) {
       try {
         const items = await fs.readdirSync(directoryPath, { withFileTypes: true });
@@ -158,17 +248,22 @@ class Gitpulse{
                 const firstPath = path.join(this.stagingPath,firstPart);
                 // console.log("Does not exts in OBJ",firstPart,lindex,filename);
                 try {
-                  console.log("A");
                   fs.mkdirSync(firstPath, { recursive: true });
                 } catch (error) {
                   console.log("ERROR ####",error)
                 }
+                // console.log("Content",content);
                 try {
-                  console.log("B");
                   fs.writeFileSync(path.join(firstPath,filename),content);
                 } catch (error) {
                   console.log("Already added to stage area");
                 }
+            }else{
+              const lindex = pathindex.lastIndexOf("/");
+              const firstPart = pathindex.slice(0, lindex);
+              const filename = pathindex.slice(lindex);
+              const firstPath = path.join(this.stagingPath,firstPart);
+              fs.writeFileSync(path.join(firstPath,filename),content);
             }
           }
         }
