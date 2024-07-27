@@ -192,7 +192,8 @@ class Gitpulse{
         const filesDir =await this.filesDirectoryToStageEverything();
         const pathnew = process.cwd();
         filesDir.forEach((files)=>{
-          this.readDirectory(path.join(pathnew,files),files);
+          console.log("PAth new ->",path.join(pathnew,files))
+          this.readDirectory(path.join(pathnew,files),files,"staging");
         })
         console.log(clc.greenBright("Everything is staged"))
       }else{
@@ -218,23 +219,26 @@ class Gitpulse{
         }else if (stats.isDirectory()){
           const items =  fs.readdirSync(filePath, { withFileTypes: true });
           console.log(filePath,file)
-          this.readDirectory(filePath,file);
+          this.readDirectory(filePath,file,"staging");
         }
         console.log(clc.green(`Added ${file} to staging area`));
       }
     }
 
-    async readDirectory(directoryPath:string,file:string) {
+    async readDirectory(directoryPath:string,file:string,pathData:string) {
       try {
-        const items = await fs.readdirSync(directoryPath, { withFileTypes: true });
+        
+        const items =  fs.readdirSync(directoryPath, { withFileTypes: true });
     
         for (const item of items) {
+          console.log("-->",directoryPath,file,item.name,pathData);
           var fullPath = path.join(directoryPath, item.name);
           fullPath = fullPath.replace(/\\/g, '/');
           const index = fullPath.indexOf(file);
          
           if (item.isDirectory()) {
-            await this.readDirectory(fullPath,file);
+            await this.readDirectory(fullPath,file,pathData);
+            console.log("Path data",pathData)
           } else if (item.isFile()) {
             const content =  fs.readFileSync(fullPath,"utf-8");
             const pathindex  = fullPath.slice(index);
@@ -245,7 +249,7 @@ class Gitpulse{
                 const lindex = pathindex.lastIndexOf("/");
                 const firstPart = pathindex.slice(0, lindex);
                 const filename = pathindex.slice(lindex);
-                const firstPath = path.join(this.stagingPath,firstPart);
+                const firstPath = pathData==="staging"?path.join(this.stagingPath,firstPart):path.join(pathData,firstPart);
                 // console.log("Does not exts in OBJ",firstPart,lindex,filename);
                 try {
                   fs.mkdirSync(firstPath, { recursive: true });
@@ -272,6 +276,21 @@ class Gitpulse{
       }
     }
 
+
+    async commit(message:string){
+      console.log("Commit Message : ",message);
+      const commitDataPath:string  = fs.readFileSync(this.commitsPath,"utf-8") ;
+      if(commitDataPath==="init"){
+        console.log("AAA");
+        const filesDir =await this.filesDirectoryToStageEverything();
+        // console.log(this.objPath,commitDataPath,filesDir);
+        const pathnew = path.join(this.objPath,commitDataPath);
+        filesDir.forEach((files)=>{
+          console.log("?????????",path.join(process.cwd(),files));
+          this.readDirectory(path.join(process.cwd(),files),files,pathnew);
+        })
+      }
+    }
 
 
 }
@@ -310,7 +329,13 @@ program
       gitpulse.saveToConfig();
   });
 
-
+  program
+  .command('commit <message>')
+  .description('Commits the project')
+  .action((message:string) => {
+      gitpulse = Gitpulse.loadFromConfig();
+      gitpulse?.commit(message);
+  });
   
   program.command('add <action>')
   .description("Add files to stage area")
